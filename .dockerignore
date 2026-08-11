@@ -1,0 +1,16 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.env
+.env.test
+.pytest_cache/
+.ruff_cache/
+frontend/node_modules/
+frontend/src/
+frontend/index.html
+frontend/package.json
+frontend/package-lock.json
+frontend/vite.config.js
+frontend/.env.development
