@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_access_token
 from app.dependencies.db import get_db
-from app.models.user_model import User
+from app.models.user_model import User, UserRole
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
@@ -39,3 +39,8 @@ async def get_current_user_optional(token: str | None = Depends(oauth2_scheme_op
     if query is None:
         return None
     return query
+
+def require_office_manager(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != UserRole.OFFICE_MANAGER:
+        raise HTTPException(status_code=403, detail="Office manager access required")
+    return current_user
