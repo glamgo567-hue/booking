@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 class DeskStatus(enum.Enum):
     CONFIRMED = "confirmed"
     CANCELLED = "cancelled"
+    PENDING = "pending"
 
 class DeskBooking(Base):
     __tablename__ = "desk_booking"

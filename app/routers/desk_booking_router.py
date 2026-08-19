@@ -11,6 +11,7 @@ from app.models.desk_booking_model import DeskBooking, DeskStatus
 from app.models.user_model import User, UserRole
 from app.schemas.desk_booking_schemas import DeskBookingCreate, DeskBookingRead
 from app.services.desk_pool import lazy_initialization, release, reserve
+from app.tasks.desk_tasks import auto_cancel_desk_booking
 
 desk_booking_router = APIRouter(prefix="/bookings", tags=["booking"])
 
@@ -26,7 +27,7 @@ async def create_desk_booking(desk_booking_data: DeskBookingCreate,
         raise HTTPException(409, "No desks available for this date")
     new_desk_booking = DeskBooking(date=desk_booking_data.date,
                                    user_id=current_user.id,
-                                   status=DeskStatus.CONFIRMED)
+                                   status=DeskStatus.PENDING)
     try:
         db.add(new_desk_booking)
         await db.commit()
@@ -34,6 +35,9 @@ async def create_desk_booking(desk_booking_data: DeskBookingCreate,
         await release(redis_client, desk_booking_data.date)
         raise HTTPException(500)
     await db.refresh(new_desk_booking)
+    auto_cancel_desk_booking.apply_async(
+        args=[new_desk_booking.id],
+        countdown=10)
     return new_desk_booking
 
 @desk_booking_router.get("/desks/me", response_model=list[DeskBookingRead])
@@ -57,3 +61,19 @@ async def delete_desk_booking(booking_id: int,
     desk_booking.status = DeskStatus.CANCELLED
     await release(redis_client, desk_booking.date)
     await db.commit()
+
+@desk_booking_router.patch("/desks/{booking_id}/confirm", response_model=DeskBookingRead)
+async def confirm_endpoint(booking_id: int, 
+                           db: AsyncSession = Depends(get_db), 
+                           current_user: User = Depends(get_current_user)):
+    desk_booking = await db.get(DeskBooking, booking_id)
+    if desk_booking is None:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if desk_booking.user_id != current_user.id: 
+        raise HTTPException(status_code=403, detail="No rights")
+    if desk_booking.status != DeskStatus.PENDING:
+        raise HTTPException(status_code=409, detail="Booking is not active")
+    desk_booking.status = DeskStatus.CONFIRMED
+    await db.commit()
+    await db.refresh(desk_booking)
+    return desk_booking

@@ -13,6 +13,7 @@ from app.schemas.room_booking_schemas import (
     RoomBookingReschedule,
 )
 from app.services.room_booking_rules import lock_room, overlap_check
+from app.tasks.room_tasks import auto_cancel_room_booking
 
 room_booking_router = APIRouter(prefix="/bookings", tags=["booking"])
 
@@ -35,6 +36,9 @@ async def create_room_booking(room_booking_data: RoomBookingCreate,
     db.add(new_room_booking)
     await db.commit()
     await db.refresh(new_room_booking)
+    auto_cancel_room_booking.apply_async(
+        args=[new_room_booking.id],
+        countdown=10)
     return new_room_booking
 
 @room_booking_router.get("/rooms/me", response_model=list[RoomBookingRead])
@@ -93,3 +97,19 @@ async def delete_room_booking(booking_id: int,
         raise HTTPException(status_code=403, detail="No rights")
     room_booking.status = RoomStatus.CANCELLED
     await db.commit()
+
+@room_booking_router.patch("/rooms/{booking_id}/confirm", response_model=RoomBookingRead)
+async def confirm_endpoint(booking_id: int, 
+                           db: AsyncSession = Depends(get_db), 
+                           current_user: User = Depends(get_current_user)):
+    room_booking = await db.get(RoomBooking, booking_id)
+    if room_booking is None:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if room_booking.user_id != current_user.id: 
+        raise HTTPException(status_code=403, detail="No rights")
+    if room_booking.status != RoomStatus.PENDING:
+        raise HTTPException(status_code=409, detail="Booking is not active")
+    room_booking.status = RoomStatus.CONFIRMED
+    await db.commit()
+    await db.refresh(room_booking)
+    return room_booking
