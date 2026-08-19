@@ -15,7 +15,7 @@ class RoomRead(BaseModel):
     equipment: str | None = None
     created_at: datetime
     
-    model_config={"from_attributes": True}
+    model_config = {"from_attributes": True}
 
 class RoomUpdate(BaseModel):
     name: str | None = None
