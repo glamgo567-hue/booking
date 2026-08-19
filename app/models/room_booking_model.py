@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 class RoomStatus(enum.Enum):
     CONFIRMED = "confirmed"
     CANCELLED = "cancelled"
+    PENDING = "pending"
 
 class RoomBooking(Base):
     __tablename__ = "room_booking"

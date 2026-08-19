@@ -4,9 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
-from app.models.room_booking_model import RoomBooking
+from app.models.room_booking_model import RoomBooking, RoomStatus
 from app.models.room_model import Room
-from app.models.user_model import User
+from app.models.user_model import User, UserRole
 from app.schemas.room_booking_schemas import (
     RoomBookingCreate,
     RoomBookingRead,
@@ -31,7 +31,7 @@ async def create_room_booking(room_booking_data: RoomBookingCreate,
                                    start_time=room_booking_data.start_time,
                                    end_time=room_booking_data.end_time,
                                    user_id=current_user.id,
-                                   status="active")
+                                   status=RoomStatus.PENDING)
     db.add(new_room_booking)
     await db.commit()
     await db.refresh(new_room_booking)
@@ -54,7 +54,7 @@ async def get_room_bookings(room_id: int,
     room = await db.get(Room, room_id)
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
-    room_bookings = (await db.execute(select(RoomBooking).where(RoomBooking.room_id == room_id, RoomBooking.status == "active").order_by(RoomBooking.start_time).offset(skip).limit(limit))).scalars().all()
+    room_bookings = (await db.execute(select(RoomBooking).where(RoomBooking.room_id == room_id, RoomBooking.status.in_([RoomStatus.CONFIRMED, RoomStatus.PENDING])).order_by(RoomBooking.start_time).offset(skip).limit(limit))).scalars().all()
     return room_bookings
 
 @room_booking_router.patch("/rooms/{booking_id}", response_model=RoomBookingRead)
@@ -65,9 +65,9 @@ async def patch_reschedule(booking_id: int,
     room_booking = await db.get(RoomBooking, booking_id)
     if room_booking is None:
         raise HTTPException(status_code=404, detail="Booking not found")
-    if room_booking.user_id != current_user.id and current_user.role != "office_manager": 
+    if room_booking.user_id != current_user.id and current_user.role != UserRole.OFFICE_MANAGER: 
         raise HTTPException(status_code=403, detail="No rights")
-    if room_booking.status != "active":
+    if room_booking.status != RoomStatus.CONFIRMED:
         raise HTTPException(status_code=409, detail="Booking is not active")
     room = await lock_room(db, room_booking.room_id)
     if room is None:
@@ -89,7 +89,7 @@ async def delete_room_booking(booking_id: int,
     room_booking = await db.get(RoomBooking, booking_id)
     if room_booking is None:
         raise HTTPException(status_code=404, detail="Booking not found")
-    if room_booking.user_id != current_user.id and current_user.role != "office_manager": 
+    if room_booking.user_id != current_user.id and current_user.role != UserRole.OFFICE_MANAGER: 
         raise HTTPException(status_code=403, detail="No rights")
-    room_booking.status = "cancelled"
+    room_booking.status = RoomStatus.CANCELLED
     await db.commit()

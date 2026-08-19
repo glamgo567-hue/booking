@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db, get_redis, get_reserve_script
-from app.models.desk_booking_model import DeskBooking
-from app.models.user_model import User
+from app.models.desk_booking_model import DeskBooking, DeskStatus
+from app.models.user_model import User, UserRole
 from app.schemas.desk_booking_schemas import DeskBookingCreate, DeskBookingRead
 from app.services.desk_pool import lazy_initialization, release, reserve
 
@@ -26,7 +26,7 @@ async def create_desk_booking(desk_booking_data: DeskBookingCreate,
         raise HTTPException(409, "No desks available for this date")
     new_desk_booking = DeskBooking(date=desk_booking_data.date,
                                    user_id=current_user.id,
-                                   status="active")
+                                   status=DeskStatus.CONFIRMED)
     try:
         db.add(new_desk_booking)
         await db.commit()
@@ -52,8 +52,8 @@ async def delete_desk_booking(booking_id: int,
     desk_booking = await db.get(DeskBooking, booking_id)
     if desk_booking is None:
         raise HTTPException(status_code=404, detail="Booking not found")
-    if desk_booking.user_id != current_user.id and current_user.role != "office_manager":
+    if desk_booking.user_id != current_user.id and current_user.role != UserRole.OFFICE_MANAGER:
         raise HTTPException(status_code=403, detail="No rights")
-    desk_booking.status = "cancelled"
+    desk_booking.status = DeskStatus.CANCELLED
     await release(redis_client, desk_booking.date)
     await db.commit()

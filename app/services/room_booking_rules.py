@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.room_booking_model import RoomBooking
+from app.models.room_booking_model import RoomBooking, RoomStatus
 from app.models.room_model import Room
 
 
@@ -14,7 +14,7 @@ async def overlap_check(room_id: int,
                         exclude_booking_id: int | None = None) -> bool:
     booking_id_conflict = (await db.execute(select(RoomBooking.id)
                                      .where(RoomBooking.room_id == room_id, 
-                                            RoomBooking.status == "active",
+                                            RoomBooking.status.in_([RoomStatus.CONFIRMED, RoomStatus.PENDING]),
                                             RoomBooking.start_time < end_time,
                                             RoomBooking.end_time > start_time,
                                             RoomBooking.id != exclude_booking_id)
