@@ -6,5 +6,5 @@ celery_app = Celery(
     "booking",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["app.tasks.room_tasks"] 
+    include=["app.tasks.room_tasks", "app.tasks.desk_tasks"] 
 )

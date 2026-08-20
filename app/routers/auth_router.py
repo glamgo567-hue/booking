@@ -3,22 +3,28 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
-from app.models.user_model import User
+from app.models.user_model import User, UserRole
 from app.schemas.user_schemas import Token, UserRead, UserRegister
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 @auth_router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def registration(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
-    user = (await db.execute(select(User).where(or_(User.username==user_data.username, User.email==user_data.email)))).scalar_one_or_none()
+    user = (await db.execute(select(User).where(or_(User.username==user_data.username, User.email==user_data.email.lower())))).scalar_one_or_none()
     if user is not None:
         raise HTTPException(status_code=409, detail="Username or email is already occupied")
     new_hashed_password = hash_password(user_data.password)
+    if user_data.email.lower() == settings.initial_admin_email.lower():
+        role = UserRole.OFFICE_MANAGER
+    else:
+        role = UserRole.USER
     new_user = User(username = user_data.username,
-                    email = user_data.email,
+                    email = user_data.email.lower(),
+                    role = role,
                     hashed_password = new_hashed_password)
     db.add(new_user)
     await db.commit()
