@@ -22,7 +22,7 @@ class RoomBooking(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    status: Mapped[RoomStatus] = mapped_column(SQLEnum(RoomStatus), default=RoomStatus.CONFIRMED)
+    status: Mapped[RoomStatus] = mapped_column(SQLEnum(RoomStatus), default=RoomStatus.PENDING)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id"))

@@ -9,6 +9,9 @@ from app.models.desk_model import Desk
 
 LUA_CODE = """
 local current = redis.call('GET', KEYS[1])
+if current == false then
+    return -1
+end
 local current_number = tonumber(current)
 if current_number > 0 then
     redis.call('DECR', KEYS[1])
@@ -25,8 +28,8 @@ async def count_active_desks(db: AsyncSession) -> int:
     return (await db.execute(select(func.count(Desk.id)).where(Desk.is_active.is_(True)))).scalar_one()
 
 async def lazy_initialization(db: AsyncSession, 
-                        redis_client: redis.Redis,
-                        booking_date: date) -> None:
+                              redis_client: redis.Redis,
+                              booking_date: date) -> None:
     desks_count_active = await count_active_desks(db)
     await redis_client.set(key_builder(booking_date), desks_count_active, nx=True)
 
@@ -41,6 +44,8 @@ async def get_available(db: AsyncSession,
 async def reserve(script: AsyncScript,
                   booking_date: date) -> bool:
     result = await script(keys=[key_builder(booking_date)])
+    if result == -1:
+        raise RuntimeError("Desk pool key missing — lazy_initialization was not called")
     return result == 1
 
 async def release(redis_client: redis.Redis,

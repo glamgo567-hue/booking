@@ -30,6 +30,14 @@ async def create_desk_booking(desk_booking_data: DeskBookingCreate,
                               redis_client: redis.Redis = Depends(get_redis),
                               script: AsyncScript = Depends(get_reserve_script)):
 
+    existing = (await db.execute(
+    select(DeskBooking).where(
+        DeskBooking.user_id == current_user.id,
+        DeskBooking.date == desk_booking_data.date,
+        DeskBooking.status.in_([DeskStatus.CONFIRMED, DeskStatus.PENDING]),))).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(409, "You already have a booking for this date")
+
     await lazy_initialization(db, redis_client, desk_booking_data.date)
     if not await reserve(script, desk_booking_data.date):
         raise HTTPException(409, "No desks available for this date")
@@ -74,9 +82,12 @@ async def delete_desk_booking(booking_id: int,
         raise HTTPException(status_code=404, detail="Booking not found")
     if desk_booking.user_id != current_user.id and current_user.role != UserRole.OFFICE_MANAGER:
         raise HTTPException(status_code=403, detail="No rights")
+    if desk_booking.status == DeskStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Booking already cancelled")
+
     desk_booking.status = DeskStatus.CANCELLED
-    await release(redis_client, desk_booking.date)
     await db.commit()
+    await release(redis_client, desk_booking.date)
 
 @desk_booking_router.patch("/desks/{booking_id}/confirm", response_model=DeskBookingRead)
 async def confirm_endpoint(booking_id: int, 

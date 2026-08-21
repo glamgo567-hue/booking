@@ -1,8 +1,6 @@
 services:
   web:
     build: .
-    volumes:
-      - .:/app  
     ports:
       - "8000:8000"
     depends_on:
@@ -17,8 +15,6 @@ services:
       - REDIS_URL=${REDIS_URL_DOCKER}
   celery_worker:
     build: .
-    volumes:
-      - .:/app
     command: celery -A app.celery_app worker --loglevel=info
     depends_on:
       db:

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
 from fastapi import FastAPI, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.routers.auth_router import auth_router
@@ -21,6 +22,14 @@ async def lifespan(app: FastAPI):
     await app.state.redis.aclose()
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.frontend_origin],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():

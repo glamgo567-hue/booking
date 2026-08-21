@@ -21,7 +21,7 @@ class DeskBooking(Base):
     __tablename__ = "desk_booking"
     id: Mapped[int] = mapped_column(primary_key=True)
     date: Mapped[date_] = mapped_column(Date)
-    status: Mapped[DeskStatus] = mapped_column(SQLEnum(DeskStatus), default=DeskStatus.CONFIRMED)
+    status: Mapped[DeskStatus] = mapped_column(SQLEnum(DeskStatus), default=DeskStatus.PENDING)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))

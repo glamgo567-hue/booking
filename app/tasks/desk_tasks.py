@@ -22,8 +22,8 @@ async def _auto_cancel(booking_id: int) -> None:
             return
         desk_booking.status = DeskStatus.CANCELLED
         await db.commit()
+        redis_client = redis.Redis.from_url(settings.redis_url)
         try:
-            redis_client = redis.Redis.from_url(settings.redis_url)
             await release(redis_client, desk_booking.date)
         finally:
             await redis_client.aclose()
