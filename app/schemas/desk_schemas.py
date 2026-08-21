@@ -1,3 +1,4 @@
+from datetime import date as date_
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -17,3 +18,7 @@ class DeskRead(BaseModel):
 class DeskUpdate(BaseModel):
     floor: int | None = None
     is_active: bool | None = None
+
+class DeskAvailability(BaseModel):
+    date: date_
+    available: int

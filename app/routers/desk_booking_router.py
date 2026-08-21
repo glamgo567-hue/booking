@@ -1,3 +1,5 @@
+from datetime import date as date_
+
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from redis.commands.core import AsyncScript
@@ -10,7 +12,13 @@ from app.dependencies.db import get_db, get_redis, get_reserve_script
 from app.models.desk_booking_model import DeskBooking, DeskStatus
 from app.models.user_model import User, UserRole
 from app.schemas.desk_booking_schemas import DeskBookingCreate, DeskBookingRead
-from app.services.desk_pool import lazy_initialization, release, reserve
+from app.schemas.desk_schemas import DeskAvailability
+from app.services.desk_pool import (
+    get_available,
+    lazy_initialization,
+    release,
+    reserve,
+)
 from app.tasks.desk_tasks import auto_cancel_desk_booking
 
 desk_booking_router = APIRouter(prefix="/bookings", tags=["booking"])
@@ -39,6 +47,14 @@ async def create_desk_booking(desk_booking_data: DeskBookingCreate,
         args=[new_desk_booking.id],
         countdown=10)
     return new_desk_booking
+
+@desk_booking_router.get("/desks/availability", response_model=DeskAvailability)
+async def get_desk_availability(date: date_ = Query(...),
+                                db: AsyncSession = Depends(get_db),
+                                current_user: User = Depends(get_current_user),
+                                redis_client: redis.Redis = Depends(get_redis)):
+    available = await get_available(db, redis_client, date)
+    return DeskAvailability(date=date, available=available)
 
 @desk_booking_router.get("/desks/me", response_model=list[DeskBookingRead])
 async def get_desk_bookings_for_me(skip: int = Query(0, ge=0),

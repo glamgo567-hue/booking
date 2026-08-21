@@ -21,11 +21,22 @@ end
 def key_builder(booking_date: date) -> str:
     return f"desk_pool:{booking_date}"
 
+async def count_active_desks(db: AsyncSession) -> int:
+    return (await db.execute(select(func.count(Desk.id)).where(Desk.is_active.is_(True)))).scalar_one()
+
 async def lazy_initialization(db: AsyncSession, 
                         redis_client: redis.Redis,
                         booking_date: date) -> None:
-    desks_count_active = (await db.execute(select(func.count(Desk.id)).where(Desk.is_active.is_(True)))).scalar_one()
+    desks_count_active = await count_active_desks(db)
     await redis_client.set(key_builder(booking_date), desks_count_active, nx=True)
+
+async def get_available(db: AsyncSession,
+                        redis_client: redis.Redis,
+                        booking_date: date) -> int:
+    current = await redis_client.get(key_builder(booking_date))
+    if current is None:
+        return await count_active_desks(db)
+    return int(current)
 
 async def reserve(script: AsyncScript,
                   booking_date: date) -> bool:
