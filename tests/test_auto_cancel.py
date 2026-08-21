@@ -73,7 +73,7 @@ async def test_successful_desk_auto_cancel(client, auth_headers, admin_auth_head
     response_create_desk_booking2 = await client.post("/bookings/desks", json=payload_desk_booking, headers=auth_headers)
     assert response_create_desk_booking2.status_code == 201
 
-async def test_confirm_desk_auto_cancel(client, admin_auth_headers, auth_headers):
+async def test_confirm_desk_auto_cancel(client, admin_auth_headers, auth_headers, dop_auth_headers):
     payload_desk = {"floor": 1}
 
     response_create_desk = await client.post("/desks", json=payload_desk, headers=admin_auth_headers)
@@ -100,8 +100,9 @@ async def test_confirm_desk_auto_cancel(client, admin_auth_headers, auth_headers
     assert response_get_room_bookings.status_code == 200
     assert data_get[0]["status"] == "confirmed"
 
-    response_create_desk_booking2 = await client.post("/bookings/desks", json=payload_desk_booking, headers=auth_headers)
+    response_create_desk_booking2 = await client.post("/bookings/desks", json=payload_desk_booking, headers=dop_auth_headers)
     assert response_create_desk_booking2.status_code == 409
+    assert response_create_desk_booking2.json()["detail"] == "No desks available for this date"
 
 async def test_non_existent_id_desk_auto_cancel(db_schema):
     await desk_auto_cancel(99999)

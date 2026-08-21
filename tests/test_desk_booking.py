@@ -16,7 +16,7 @@ async def test_create_desk_booking(client, auth_headers, admin_auth_headers):
     assert data["created_at"]
     assert data["user_id"]
 
-async def test_pool_is_exhausted_desk_booking(client, auth_headers, admin_auth_headers):
+async def test_pool_is_exhausted_desk_booking(client, auth_headers, dop_auth_headers, admin_auth_headers):
     payload_desk = {"floor": 1}
 
     response_create_desk = await client.post("/desks", json=payload_desk, headers=admin_auth_headers)
@@ -28,8 +28,9 @@ async def test_pool_is_exhausted_desk_booking(client, auth_headers, admin_auth_h
     response_create_desk_booking1 = await client.post("/bookings/desks", json=payload_desk_booking1, headers=auth_headers)
     assert response_create_desk_booking1.status_code == 201
 
-    response_create_desk_booking2 = await client.post("/bookings/desks", json=payload_desk_booking2, headers=auth_headers)
+    response_create_desk_booking2 = await client.post("/bookings/desks", json=payload_desk_booking2, headers=dop_auth_headers)
     assert response_create_desk_booking2.status_code == 409
+    assert response_create_desk_booking2.json()["detail"] == "No desks available for this date"
 
 async def test_no_token_desk_booking(client):
     payload_desk_booking = {"date": "2026-09-01"}

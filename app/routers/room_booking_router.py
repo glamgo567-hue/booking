@@ -1,3 +1,6 @@
+from datetime import date as date_
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,6 +54,7 @@ async def get_room_bookings_for_me(skip: int = Query(0, ge=0),
 
 @room_booking_router.get("/rooms/{room_id}", response_model=list[RoomBookingRead])
 async def get_room_bookings(room_id: int, 
+                            date: date_ | None = Query(None),
                             skip: int = Query(0, ge=0),
                             limit: int = Query(10, ge=1, le=100),
                             db: AsyncSession = Depends(get_db),
@@ -58,7 +62,17 @@ async def get_room_bookings(room_id: int,
     room = await db.get(Room, room_id)
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
-    room_bookings = (await db.execute(select(RoomBooking).where(RoomBooking.room_id == room_id, RoomBooking.status.in_([RoomStatus.CONFIRMED, RoomStatus.PENDING])).order_by(RoomBooking.start_time).offset(skip).limit(limit))).scalars().all()
+    query = select(RoomBooking).where(
+        RoomBooking.room_id == room_id,
+        RoomBooking.status.in_([RoomStatus.CONFIRMED, RoomStatus.PENDING]),
+    )
+    if date is not None:
+        day_start = datetime.combine(date, datetime.min.time(), tzinfo=timezone.utc)
+        day_end = datetime.combine(date, datetime.max.time(), tzinfo=timezone.utc)
+        query = query.where(RoomBooking.start_time <= day_end, RoomBooking.end_time >= day_start)
+    room_bookings = (await db.execute(
+        query.order_by(RoomBooking.start_time).offset(skip).limit(limit)
+    )).scalars().all()
     return room_bookings
 
 @room_booking_router.patch("/rooms/{booking_id}", response_model=RoomBookingRead)

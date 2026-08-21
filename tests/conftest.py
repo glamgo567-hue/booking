@@ -13,7 +13,7 @@ from app.main import app
 from app.models.base_model import Base
 from app.services.desk_pool import LUA_CODE
 
-engine = create_async_engine(settings.database_url)
+engine = create_async_engine(settings.database_url, connect_args={"statement_cache_size": 0})
 async_session_maker = async_sessionmaker(
     engine,
     class_=AsyncSession,

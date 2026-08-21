@@ -116,6 +116,35 @@ async def test_non_existent_id_get_room_booking(client, auth_headers):
     response_get_room_booking = await client.get(f"/bookings/rooms/{99999}", headers=auth_headers)
     assert response_get_room_booking.status_code == 404
 
+async def test_get_room_booking_filtered_by_date(client, room, auth_headers):
+    payload_room_booking1 = {"room_id": room["id"],
+                            "start_time": "2026-09-01T10:00:00+03:00",
+                            "end_time": "2026-09-01T12:00:00+03:00"}
+
+    payload_room_booking2 = {"room_id": room["id"],
+                            "start_time": "2026-09-05T10:00:00+03:00",
+                            "end_time": "2026-09-05T12:00:00+03:00"}
+
+    response1 = await client.post("/bookings/rooms", json=payload_room_booking1, headers=auth_headers)
+    response2 = await client.post("/bookings/rooms", json=payload_room_booking2, headers=auth_headers)
+    data1 = response1.json()
+    data2 = response2.json()
+
+    assert response1.status_code == 201
+    assert response2.status_code == 201
+
+    response_get_filtered = await client.get(f"/bookings/rooms/{room["id"]}", params={"date": "2026-09-01"}, headers=auth_headers)
+    data_get = response_get_filtered.json()
+
+    assert response_get_filtered.status_code == 200
+    assert len(data_get) == 1
+    assert data_get[0]["id"] == data1["id"]
+
+    response_get_unfiltered = await client.get(f"/bookings/rooms/{room["id"]}", headers=auth_headers)
+    data_get_all = response_get_unfiltered.json()
+    assert len(data_get_all) == 2
+    assert {b["id"] for b in data_get_all} == {data1["id"], data2["id"]}
+
 async def test_no_token_get_room_booking(client, room, auth_headers):
     payload_room_booking = {"room_id": room["id"],
                             "start_time": "2026-09-01T10:00:00+03:00",

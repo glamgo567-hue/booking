@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import require_office_manager
 from app.dependencies.db import get_db
+from app.models.room_booking_model import RoomBooking
 from app.models.room_model import Room
 from app.models.user_model import User
 from app.schemas.room_schemas import RoomCreate, RoomRead, RoomUpdate
@@ -62,5 +63,10 @@ async def delete_room(room_id: int,
     room = await db.get(Room, room_id)
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
+    has_bookings = (await db.execute(
+        select(RoomBooking.id).where(RoomBooking.room_id == room_id).limit(1)
+    )).scalar_one_or_none()
+    if has_bookings is not None:
+        raise HTTPException(status_code=409, detail="Cannot delete room with existing bookings")
     await db.delete(room)
     await db.commit()
