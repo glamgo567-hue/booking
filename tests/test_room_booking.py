@@ -366,3 +366,55 @@ async def test_double_delete_room_booking(client, room, auth_headers):
 
     response_second = await client.delete(f"/bookings/rooms/{booking_id}", headers=auth_headers)
     assert response_second.status_code == 409
+    
+async def test_get_all_room_bookings(client, room, auth_headers, dop_auth_headers, admin_auth_headers):
+    payload_room_booking1 = {"room_id": room["id"],
+                             "start_time": "2026-09-01T10:00:00+00:00",
+                             "end_time": "2026-09-01T11:00:00+00:00"}
+    payload_room_booking2 = {"room_id": room["id"],
+                             "start_time": "2026-09-10T10:00:00+00:00",
+                             "end_time": "2026-09-10T11:00:00+00:00"}
+
+    response_create_room_booking1 = await client.post("/bookings/rooms", json=payload_room_booking1, headers=auth_headers)
+    assert response_create_room_booking1.status_code == 201
+
+    response_create_room_booking2 = await client.post("/bookings/rooms", json=payload_room_booking2, headers=dop_auth_headers)
+    assert response_create_room_booking2.status_code == 201
+
+    response_get_all = await client.get("/bookings/rooms", headers=admin_auth_headers)
+    data_all = response_get_all.json()
+
+    assert response_get_all.status_code == 200
+    assert len(data_all) == 2
+
+    response_get_by_date = await client.get("/bookings/rooms", params={"date": "2026-09-01"}, headers=admin_auth_headers)
+    data_by_date = response_get_by_date.json()
+
+    assert response_get_by_date.status_code == 200
+    assert len(data_by_date) == 1
+    assert data_by_date[0]["id"] == response_create_room_booking1.json()["id"]
+
+async def test_cancelled_excluded_get_all_room_bookings(client, room, auth_headers, admin_auth_headers):
+    payload_room_booking = {"room_id": room["id"],
+                            "start_time": "2026-09-01T10:00:00+00:00",
+                            "end_time": "2026-09-01T11:00:00+00:00"}
+
+    response_create_room_booking = await client.post("/bookings/rooms", json=payload_room_booking, headers=auth_headers)
+    data_booking = response_create_room_booking.json()
+    assert response_create_room_booking.status_code == 201
+
+    response_delete = await client.delete(f"/bookings/rooms/{data_booking['id']}", headers=auth_headers)
+    assert response_delete.status_code == 204
+
+    response_get_all = await client.get("/bookings/rooms", headers=admin_auth_headers)
+
+    assert response_get_all.status_code == 200
+    assert response_get_all.json() == []
+
+async def test_not_manager_get_all_room_bookings(client, auth_headers):
+    response_get_all = await client.get("/bookings/rooms", headers=auth_headers)
+    assert response_get_all.status_code == 403
+
+async def test_no_token_get_all_room_bookings(client):
+    response_get_all = await client.get("/bookings/rooms")
+    assert response_get_all.status_code == 401

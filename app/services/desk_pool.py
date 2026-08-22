@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 import redis.asyncio as redis
 from redis.commands.core import AsyncScript
@@ -40,6 +40,23 @@ async def get_available(db: AsyncSession,
     if current is None:
         return await count_active_desks(db)
     return int(current)
+
+async def get_available_range(db: AsyncSession,
+                              redis_client: redis.Redis,
+                              date_from: date,
+                              date_to: date) -> dict[date, int]:
+    dates = [date_from + timedelta(days=offset) for offset in range((date_to - date_from).days + 1)]
+    current = await redis_client.mget([key_builder(booking_date) for booking_date in dates])
+    desks_count_active = None
+    available = {}
+    for index, booking_date in enumerate(dates):
+        if current[index] is None:
+            if desks_count_active is None:
+                desks_count_active = await count_active_desks(db)
+            available[booking_date] = desks_count_active
+        else:
+            available[booking_date] = int(current[index])
+    return available
 
 async def reserve(script: AsyncScript,
                   booking_date: date) -> bool:

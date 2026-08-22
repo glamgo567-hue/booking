@@ -1,4 +1,14 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_BOOKING_AUTO_CANCEL_SECONDS: ${BOOKING_AUTO_CANCEL_SECONDS}
+    ports:
+      - "5173:80"
+    depends_on:
+      - web
   web:
     build: .
     ports:

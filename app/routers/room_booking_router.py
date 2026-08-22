@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, require_office_manager
 from app.dependencies.db import get_db
 from app.models.room_booking_model import RoomBooking, RoomStatus
 from app.models.room_model import Room
@@ -51,6 +51,24 @@ async def get_room_bookings_for_me(skip: int = Query(0, ge=0),
                                    db: AsyncSession = Depends(get_db),
                                    current_user: User = Depends(get_current_user)):
     room_bookings = (await db.execute(select(RoomBooking).where(RoomBooking.user_id == current_user.id).order_by(RoomBooking.start_time).offset(skip).limit(limit))).scalars().all()
+    return room_bookings
+
+@room_booking_router.get("/rooms", response_model=list[RoomBookingRead])
+async def get_all_room_bookings(date: date_ | None = Query(None),
+                                skip: int = Query(0, ge=0),
+                                limit: int = Query(10, ge=1, le=100),
+                                db: AsyncSession = Depends(get_db),
+                                current_user: User = Depends(require_office_manager)):
+    query = select(RoomBooking).where(
+        RoomBooking.status.in_([RoomStatus.CONFIRMED, RoomStatus.PENDING]),
+    )
+    if date is not None:
+        day_start = datetime.combine(date, datetime.min.time(), tzinfo=timezone.utc)
+        day_end = datetime.combine(date, datetime.max.time(), tzinfo=timezone.utc)
+        query = query.where(RoomBooking.start_time <= day_end, RoomBooking.end_time >= day_start)
+    room_bookings = (await db.execute(
+        query.order_by(RoomBooking.start_time).offset(skip).limit(limit)
+    )).scalars().all()
     return room_bookings
 
 @room_booking_router.get("/rooms/{room_id}", response_model=list[RoomBookingRead])
