@@ -346,3 +346,23 @@ async def test_no_token_confirm_room_booking(client, room, auth_headers):
 
     response_confirm = await client.patch(f"/bookings/rooms/{data['id']}/confirm")
     assert response_confirm.status_code == 401
+
+async def test_past_start_time_create_room_booking(client, room, auth_headers):
+    payload = {"room_id": room["id"],
+               "start_time": "2020-01-01T10:00:00+00:00",
+               "end_time": "2020-01-01T11:00:00+00:00"}
+    response = await client.post("/bookings/rooms", json=payload, headers=auth_headers)
+    assert response.status_code == 422
+
+async def test_double_delete_room_booking(client, room, auth_headers):
+    payload = {"room_id": room["id"],
+               "start_time": "2026-09-01T10:00:00+03:00",
+               "end_time": "2026-09-01T11:00:00+03:00"}
+    response_create = await client.post("/bookings/rooms", json=payload, headers=auth_headers)
+    booking_id = response_create.json()["id"]
+
+    response_first = await client.delete(f"/bookings/rooms/{booking_id}", headers=auth_headers)
+    assert response_first.status_code == 204
+
+    response_second = await client.delete(f"/bookings/rooms/{booking_id}", headers=auth_headers)
+    assert response_second.status_code == 409

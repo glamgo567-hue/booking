@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
 from app.models.room_booking_model import RoomBooking, RoomStatus
@@ -41,7 +42,7 @@ async def create_room_booking(room_booking_data: RoomBookingCreate,
     await db.refresh(new_room_booking)
     auto_cancel_room_booking.apply_async(
         args=[new_room_booking.id],
-        countdown=10)
+        countdown=settings.booking_auto_cancel_seconds)
     return new_room_booking
 
 @room_booking_router.get("/rooms/me", response_model=list[RoomBookingRead])
@@ -109,6 +110,8 @@ async def delete_room_booking(booking_id: int,
         raise HTTPException(status_code=404, detail="Booking not found")
     if room_booking.user_id != current_user.id and current_user.role != UserRole.OFFICE_MANAGER: 
         raise HTTPException(status_code=403, detail="No rights")
+    if room_booking.status == RoomStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Booking already cancelled")
     room_booking.status = RoomStatus.CANCELLED
     await db.commit()
 

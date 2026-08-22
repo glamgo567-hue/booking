@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db, get_redis, get_reserve_script
 from app.models.desk_booking_model import DeskBooking, DeskStatus
@@ -53,7 +54,7 @@ async def create_desk_booking(desk_booking_data: DeskBookingCreate,
     await db.refresh(new_desk_booking)
     auto_cancel_desk_booking.apply_async(
         args=[new_desk_booking.id],
-        countdown=10)
+        countdown=settings.booking_auto_cancel_seconds)
     return new_desk_booking
 
 @desk_booking_router.get("/desks/availability", response_model=DeskAvailability)

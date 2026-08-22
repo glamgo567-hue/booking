@@ -203,3 +203,11 @@ async def test_no_token_confirm_desk_booking(client, auth_headers, admin_auth_he
 
     response_confirm = await client.patch(f"/bookings/desks/{data_booking['id']}/confirm")
     assert response_confirm.status_code == 401
+
+async def test_past_date_create_desk_booking(client, admin_auth_headers, auth_headers):
+    payload_desk = {"floor": 1}
+    await client.post("/desks", json=payload_desk, headers=admin_auth_headers)
+
+    payload_booking = {"date": "2020-01-01"}
+    response = await client.post("/bookings/desks", json=payload_booking, headers=auth_headers)
+    assert response.status_code == 422

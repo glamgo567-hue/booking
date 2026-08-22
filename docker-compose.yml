@@ -8,11 +8,27 @@ services:
         condition: service_healthy
       redis: 
         condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
       - DATABASE_URL=${DATABASE_URL_DOCKER}
       - REDIS_URL=${REDIS_URL_DOCKER}
+  db_init:
+    image: postgres:16
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        psql "postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@db:5432/$$POSTGRES_DB" -tc \
+          "SELECT 1 FROM pg_database WHERE datname = 'booking_test'" | grep -q 1 || \
+        psql "postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@db:5432/$$POSTGRES_DB" -c \
+          "CREATE DATABASE booking_test"
   celery_worker:
     build: .
     command: celery -A app.celery_app worker --loglevel=info
@@ -21,6 +37,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
